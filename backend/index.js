@@ -1,7 +1,10 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const BusinessRouter = require('../backend/Routes/BusinessRoutes');
+const PORT = 5500;
 const app = express();
 app.use(express.json());
+app.use('/api/buisness-manager',BusinessRouter);
 mongoose.connect('mongodb://localhost:27017/buisness-management',{
     useNewUrlParser:true,
     useUnifiedTopology:true
@@ -10,28 +13,5 @@ mongoose.connect('mongodb://localhost:27017/buisness-management',{
 }).catch((error)=>{
     console.log("unsuccessful connection error",error);
 })
-// const buisnesschema = new mongoose.Schema({
-//     name:String,
-//     owner:String
-// });
-// const Buisness = mongoose.model("Buisness",buisnesschema);
-// const dummydata = [
-// {
-//     name:"confectionary",
-//     owner:"sudha kumari"
-// }
-// ,
-// {
-//     name:"Stationary",
-//     owner:"sandeep sharma"
-// }
-// ]
-// const insertData = async()=>{
-//     try{
-//         await Buisness.insertMany(dummydata);
-//         console.log("dummy data inserted successfully");
-//     } catch(error) {
-//         console.error("error has occured",error);
-//     }
-// }
-// insertData();
+
+app.listen(PORT,()=>console.log("app is running on the port:",PORT));

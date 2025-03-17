@@ -13,6 +13,7 @@ const Products = new mongoose.Schema({
         required:[true,'please enter the per head cost']
     },
     TotalCostSpent:{
+        
         type:Number,
         required:[true,'please enter the total cost spent to buy the item for buisness']
     }
