@@ -25,7 +25,7 @@ const OwnerSchema = new mongoose.Schema({
         required:[true,'please re-enter password to confirm'],
         validate:{
             validator:function(value) {
-               return value = this.password;
+               return value == this.password;
             },
             message:"your password and confirm password does not match"
         }
