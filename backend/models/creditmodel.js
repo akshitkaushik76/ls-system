@@ -9,6 +9,13 @@ const Creditschema = new mongoose.Schema({
     quantity:{
         type:Number,
         required:[true,'please enter the quantity'],
+    },
+    unit:{
+        type:String,
+        enum:['pieces','grams']
+    },
+    totalCost:{
+        type:Number
     }
 })
 const Credits = mongoose.model('credit',Creditschema);
