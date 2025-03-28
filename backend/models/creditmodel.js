@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');//for products of fixed quantity
 
 const Creditschema = new mongoose.Schema({
+    recipient_name:{
+        type:String,
+        required:[true,'please enter the recipient name']
+    },
     product:{
         type:String,
         required:[true,'please enter the product taken '],
@@ -16,7 +20,11 @@ const Creditschema = new mongoose.Schema({
     },
     totalCost:{
         type:Number
+    },
+    issued:{
+        type:String,
     }
+    
 })
 const Credits = mongoose.model('credit',Creditschema);
 module.exports = Credits;

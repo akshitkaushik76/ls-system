@@ -8,6 +8,11 @@ const Products = new mongoose.Schema({
         type:Number,
         required:[true,'please enter the total quantity of product']
     },
+    unit:{
+      type:String,
+      enum:['pieces','grams'],
+      required:[true,'please enter the quantity unit']
+    },
     perheadCost:{
         type:Number,
         required:[true,'please enter the per head cost']
