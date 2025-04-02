@@ -17,6 +17,9 @@ const Products = new mongoose.Schema({
         type:Number,
         required:[true,'please enter the per head cost']
     },
+    sellingPrice:{
+        type:Number,
+    },
     TotalCostSpent:{
         
         type:Number,
