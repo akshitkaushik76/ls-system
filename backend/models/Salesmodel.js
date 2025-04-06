@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const salesRecords = mongoose.Schema({
-    productname:{
+    ProductName:{
         type:String,
         required:[true,'please enter the product']
     },

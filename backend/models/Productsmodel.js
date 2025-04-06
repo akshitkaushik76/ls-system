@@ -10,7 +10,7 @@ const Products = new mongoose.Schema({
     },
     unit:{
       type:String,
-      enum:['pieces','grams'],
+      enum:['pieces','kilograms'],
       required:[true,'please enter the quantity unit']
     },
     perheadCost:{

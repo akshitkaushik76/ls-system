@@ -6,20 +6,49 @@ const Unreg = require('../models/Unregcustmodel');
 const Owner = require('../models/OwnerModel');
 const Sale = require('../models/Salesmodel');
 exports.addProduct =  async (req,res,next)=>{
-    try{
-        console.log(req.body);
-        const product = await Product.create(req.body);
-        res.status(201).json({
-            message:'success',
-            data:product,
-        }) 
-    }
-    catch(error) {
-        res.status(500).json({
-            message:'fail',
-            error,
-        })
-    }
+   try{
+    const {ProductName} = req.body;
+    const {perheadCost} = req.body;
+    const {Quantity} = req.body;
+    const {sellingPrice} = req.body;
+    const {unit} = req.body;
+    const TotalCostSpent = perheadCost*Quantity;
+    const exist = await Product.findOne({ProductName});
+    console.log(exist);
+    if(exist) {
+       const newQuantity = Quantity+exist.Quantity;
+       const newCost = TotalCostSpent+exist.TotalCostSpent;
+       console.log("new parameters are:",newQuantity,newCost);
+       const updatedata = await Product.findOneAndUpdate({ProductName},{
+        Quantity:newQuantity,
+        TotalCostSpent:newCost
+       },{new:true});
+       return res.status(201).json({
+        status:'success',
+        data:updatedata
+       })
+    } 
+    else{
+    const data = await Product.create({
+         ProductName,
+         Quantity,
+         unit,
+         perheadCost,
+         sellingPrice,
+         TotalCostSpent
+    })
+    return res.status(201).json({
+        status:'success',
+        data
+    })
+   }
+}
+ catch(error) {
+    res.status(500).json({
+        status:'fail',
+        error,
+    })
+   }
 }
 exports.getProducts = async(req,res,next)=>{
     try{
@@ -36,47 +65,37 @@ exports.getProducts = async(req,res,next)=>{
  }
  exports.addCredit = async(req,res,next)=>{
     try{
-        console.log(req.body);
-        const formattedDate = new Date().toLocaleString("en-IN",{timeZone:"Asia/kolkata"})
-        const {recipient_name,product,quantity,unit} = req.body;
-        const ProductData = await Product.findOne({ProductName:product});
-        console.log(ProductData);
-        
-        if(!ProductData) {
-            return res.status(404).json({status:'fail',message:'cant find the product'});
+        const {recipient_name,product,quantity} = req.body;
+        console.log(product)
+        const Prod = await Product.findOne({ProductName:product});
+        console.log(Prod);
+        if(!Prod) {
+            return res.status(404).json({
+                status:'fail',
+                message:'please enter the product first',
+            })
         }
-        const customer = await Customers.findOne({name:recipient_name});
-        if(!customer) {
-            const newunreg = await Unreg.create({
-                name:recipient_name,
-                issuedat:formattedDate 
-            });
-            return res.status(201).json({status:"Success",message:"warning! new user found please ask customer to register",data:newunreg});
-        } 
-        let  totalCost = 0;
-        const unitCost = ProductData.perheadCost;
-       if(unit === 'pieces' || unit === 'grams') {
-         totalCost = quantity*unitCost;
-       }
-       const newCredit = await CreditModel.create({
-         recipient_name,
-         product,
-         quantity,
-         unit,
-         totalCost,
-         issued:formattedDate
-       })
-       res.status(201).json({
-         status:"success",
-         newCredit
-       })
-     }
-    catch(error) {
+
+        
+        const Sellingprice = Prod.sellingPrice;
+        const totalCost = quantity*Sellingprice;
+        const data = await CreditModel.create({
+            recipient_name,
+            product,
+            quantity,
+            totalCost,
+            
+        })
+        res.status(201).json({
+            status:'success',
+            data
+        })
+    }catch(error) {
         res.status(500).json({
-            message:'fail',
+            status:'fail',
             error
         })
-    }
+    } 
  }
  exports.getCredits = async(req,res,next)=>{
     try{
@@ -152,34 +171,38 @@ exports.getOwner = async(req,res,next)=>{
     }
 }
 exports.addSales = async(req,res,next)=>{
-    try{
-        const {ProductName} = req.body;
-        const {number} = req.body;
-        const Product = await Product.findOne({ProductName})
-        console.log(Product);
-        const perhead = Product.perheadCost;
-        const sellingprice = Product.sellingPrice;
-        const cost = perhead*number;
-        const sell = number*sellingprice;
-        const profit = sell-cost;
-        const sale = await Sale.create({
-            Productname,
-            number,
-            unit,
-            cost,
-            profit,
-            date
-        })
-        res.status(201).json({
-            status:'success',
-            sale
-        })
-        
-    }
-    catch(error) {
-        res.status(500).json({
-            status:'unsuccessful',
-            error
+   try{
+    const {ProductName} = req.body;
+    const {number} = req.body;
+    console.log("product and quantity is:",ProductName,number);
+    const product = await Product.findOne({ProductName});
+    console.log(product)
+    if(!product) {
+        return res.status(404).json({
+            status:'fail',
+            message:'product not found'
         })
     }
+    console.log(product);
+    const cost  = product.perheadCost
+    const sell = product.sellingPrice
+    const profit = (sell-cost)*number;
+    const unit = product.unit
+    const sales = await Sale.create({
+        ProductName,
+        number,
+        unit,
+        sell,
+        profit,
+    })
+    res.status(201).json({
+        status:'success',
+        sales
+    })
+   }catch(error) {
+    res.status(500).json({
+        status:'fail',
+        error
+    })
+   }
 }

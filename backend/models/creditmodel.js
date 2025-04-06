@@ -14,15 +14,15 @@ const Creditschema = new mongoose.Schema({
         type:Number,
         required:[true,'please enter the quantity'],
     },
-    unit:{
-        type:String,
-        enum:['pieces','grams']
-    },
+
     totalCost:{
         type:Number
     },
     issued:{
         type:String,
+        default:function() {
+            return new Date().toLocaleDateString('en-GB');
+        }
     }
     
 })

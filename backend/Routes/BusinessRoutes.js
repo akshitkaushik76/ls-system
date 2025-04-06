@@ -7,4 +7,6 @@ router.route('/addCredits').post(Controller1.addCredit);
 router.route('/getCredits').get(Controller1.getCredits);
 router.route('/getCustomers').get(Controller1.getCustomers);
 router.route('/addCustomers').post(Controller1.addCustomers);
+router.route('/addSales').post(Controller1.addSales);
+
 module.exports = router;
