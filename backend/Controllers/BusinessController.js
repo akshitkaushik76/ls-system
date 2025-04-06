@@ -206,3 +206,34 @@ exports.addSales = async(req,res,next)=>{
     })
    }
 }
+exports.getSaleReportBydate = async(req,res,next)=>{
+    try{
+       const {date} = req.body;
+       const result = await Sale.aggregate([
+        {$match:{date:date}},
+        {$group:{
+            _id:null,
+            totalProfit:{$sum:"$profit"},
+            totalTransactions:{$sum:1}
+        }},
+        {
+            $project:{
+                _id:0,
+                date:{$literal:date},
+                totalProfit:1,
+                totalTransactions:1
+            }
+        }
+       ]);
+       res.status(200).json({
+        status:'success',
+        result
+       })
+    } catch(error) {
+        res.status(500).json({
+            status:'fail',
+            error
+        })
+    }
+}
+
