@@ -236,4 +236,76 @@ exports.getSaleReportBydate = async(req,res,next)=>{
         })
     }
 }
-
+exports.getFormattedDateTime = ()=>{
+    const now  = new Date();
+    const date = now.getDate().toString().padStart(2,'0');
+    const month = (now.getMonth()+1).toString().padStart(2,'0');
+    const year = now.getFullYear();
+    const hours = now.getHours().toString().padStart(2,'0');
+    const minutes = now.getMinutes().toString().padStart(2,'0');
+    return `${date}/${month}/${year}  ${hours}:${minutes}`;
+}
+exports.patchCredit  = async(req,res,next)=>{
+    try{
+     const updateData = {
+        ...req.body,
+        updatedAt:this.getFormattedDateTime()
+     }
+     const updatecredit  = await CreditModel.findByIdAndUpdate({name,date},{$set:req.body},{runValidators:true});
+     if(!credit) {
+        return res.status(404).json({status:'unsuccessful',message:'user not found'});
+     }    
+     res.status(201).json({
+        status:'success',
+        credit
+     })
+    }
+    catch(error) {
+        res.status(500).json({
+            status:'unsucessful',
+            error,
+        })
+    }
+}
+exports.deleteCredit = async(req,res,next)=>{
+   try{
+    const {name,date} = req.params;
+    const deleteCredit = await CreditModel.findByIdAndDelete({name,date});
+    if(!deleteCredit) {
+        return res.status(500).json({status:'unsuccess',message:'user not found'});
+    }
+    res.status(201).json({
+        status:'unsuccessfull',
+        message:`the record for ${name} and ${date} is deleted`
+    })
+    }
+    catch(error) {
+        res.status(500).json({
+            status:'unsuccessful',
+            error
+        })
+    }
+}
+exports.patchSales = async(req,res,next)=>{
+    try{
+        const {name,date} = req.params;
+        const updatedData = {...req.body,updatedAt}
+        const UpdateSales  = await Sale.findByIdAndUpdate({name,date});
+        if(!UpdateSales) {
+            return res.status(404).json({
+                status:'unsuccessful',
+                message:'the user does not exist'
+            })
+        }
+        res.status(201).json({
+            status:'success',
+            UpdatedDate:UpdateSales
+        })
+    }
+    catch(error) {
+        res.status(500).json({
+            status:'unsuccessful',
+            error
+        })
+    } 
+}

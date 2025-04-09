@@ -9,4 +9,6 @@ router.route('/getCustomers').get(Controller1.getCustomers);
 router.route('/addCustomers').post(Controller1.addCustomers);
 router.route('/addSales').post(Controller1.addSales);
 router.route('/getSaleBydate').get(Controller1.getSaleReportBydate);
+router.patch('/updateCredit').patch(Controller1.patchCredit);
+router.delete('/deleteCredit').delete(Controller1.deleteCredit);
 module.exports = router;
