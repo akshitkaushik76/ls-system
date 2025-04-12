@@ -11,6 +11,8 @@ router.route('/addSales').post(Controller1.addSales);
 router.route('/getSaleBydate').get(Controller1.getSaleReportBydate);
 router.route('/updateCredit/:name/:date').patch(Controller1.patchCredit);
 router.route('/deleteCredit/:name/:date/:time').delete(Controller1.deleteCredit);
+router.route('/updateCustomers/:name/:emailid').patch(Controller1.patchCustomers);
+router.route('/updateProduct/:ProductName').patch(Controller1.patchProducts);
 module.exports = router;
 //nest js->node js environment//python->flask,django+postgresql->database, bangalore=:>django,fast api
 //lot of internship opps

@@ -263,8 +263,9 @@ exports.getProducts = async(req,res,next)=>{
 }
 exports.patchCustomers = async(req,res,next)=>{
     try{
-        const {name,emailid} = req.params.name;
-        const customer = await Customers.findOne({name,emailid});
+        const {name} = req.params.name;
+        const customer = await Customers.findOne({name});
+        console.log(customer)
         if(!customer) {
             return res.status(404).json({
                 status:'unsuccessfull',
