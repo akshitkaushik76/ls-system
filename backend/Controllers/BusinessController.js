@@ -5,6 +5,16 @@ const Customers = require('../models/Customermodel');
 const Unreg = require('../models/Unregcustmodel');
 const Owner = require('../models/OwnerModel');
 const Sale = require('../models/Salesmodel');
+const getFormattedDateTime = ()=>{
+    const now  = new Date();
+    const date = now.getDate().toString().padStart(2,'0');
+    const month = (now.getMonth()+1).toString().padStart(2,'0');
+    const year = now.getFullYear();
+    const hours = now.getHours().toString().padStart(2,'0');
+    const minutes = now.getMinutes().toString().padStart(2,'0');
+    return `${date}/${month}/${year}  ${hours}:${minutes}`;
+}
+//---------PRODUCT CONTROLLERS---------------------------//
 exports.addProduct =  async (req,res,next)=>{
    try{
     const {ProductName} = req.body;
@@ -63,6 +73,49 @@ exports.getProducts = async(req,res,next)=>{
         })
     }
  }
+ exports.patchProducts = async(req,res,next)=>{
+    try{
+        const {ProductName} = req.params;
+        const product = await Product.findOne({ProductName});
+        console.log(product);
+        if(!product) {
+            return res.status(404).json({
+                status:'unsuccessfull',
+                message:'product does not exist'
+            })
+        }
+        let updateQuantity = req.body.Quantity ?? product.Quantity;
+        let updateName = req.body.ProductName ?? product.ProductName;
+        let UperHeadCost = req.body.perheadCost ?? product.perheadCost;
+        let upsellingPrice = req.body.sellingPrice ?? product.sellingPrice;
+        const updatedData = {
+            ...req.body,
+            ProductName:updateName,
+            Quantity:updateQuantity,
+            unit:product.unit,
+            perheadCost:UperHeadCost,
+            sellingPrice:upsellingPrice,
+            TotalCostSpent:updateQuantity*(product.TotalCostSpent/product.Quantity),
+            updatedAt:getFormattedDateTime()
+        }
+        const updatedProduct = await Product.findOneAndDeleteUpdate(
+            {ProductName},
+            {$set:updatedData},
+            {new:true,runValidators:true}
+        )
+        res.status(201).json({
+            status:'success',
+            updatedProduct
+        })
+    }catch(error) {
+        res.status(500).json({
+            status:'unsuccessfull',
+            error
+        })
+    }
+ }
+
+ //-------------------CREDIT-CONTROLLERS-----------------------------------
  exports.addCredit = async(req,res,next)=>{
     try{
         const {recipient_name,product,quantity} = req.body;
@@ -112,6 +165,73 @@ exports.getProducts = async(req,res,next)=>{
         })
     }
  }
+ exports.patchCredit  = async(req,res,next)=>{
+    try{
+     const {name,date} = req.params;
+     console.log(name,date);
+     const existingCredit = await CreditModel.findOne({recipient_name:name,issued:date});
+     console.log(existingCredit)
+     if(!existingCredit) {
+         return res.status(404).json({
+             status:'unsuccessful',
+             message:'user not found'
+         });
+     }
+      let updatedQuanted = req.body.quantity ?? existingCredit.quantity;
+      let updatedProduct = req.body.product ?? existingCredit.product;
+      let updatedRecipient = req.body.recipient_name ?? existingCredit.recipient_name;
+      const updatedData = {
+         ...req.body,
+         recipient_name:updatedRecipient,
+         product:updatedProduct,
+         quantity:updatedQuanted,
+         totalCost:updatedQuanted*(existingCredit.totalCost/existingCredit.quantity),
+         updatedAt:getFormattedDateTime()
+         
+      };
+      const updatedCredit = await CreditModel.findOneAndUpdate(
+         {
+             recipient_name:name,issued:date
+         },
+         {
+             $set:updatedData
+         },
+         {
+             new:true,runValidators:true
+         }
+      );
+      res.status(200).json({
+         status:'success',
+         credit:updatedCredit
+      });
+    }catch(error) {
+     res.status(500).json({
+         status:'unsuccessful',
+         error:error.message
+     })
+    }
+ }
+ exports.deleteCredit = async(req,res,next)=>{
+    try{
+     const {name,date,time} = req.params;
+     console.log(name,date,time);
+     const deleteCredit = await CreditModel.findOneAndDelete({recipient_name:name,issued:date,time:time});
+     if(!deleteCredit) {
+         return res.status(500).json({status:'unsuccess',message:'user not found'});
+     }
+     res.status(201).json({
+         status:'successfull',
+         message:`the record for ${name} and ${date} is deleted`
+     })
+     }
+     catch(error) {
+         res.status(500).json({
+             status:'unsuccessful',
+             error
+         })
+     }
+ }
+ //----------------------- CUSTOMERS-CONTROLLERS OWNER-CONTROLLERS -------------------------//
  exports.addCustomers = async(req,res,next)=>{
     console.log(req.body);
     try{
@@ -140,6 +260,40 @@ exports.getProducts = async(req,res,next)=>{
         error
      })
    }
+}
+exports.patchCustomers = async(req,res,next)=>{
+    try{
+        const {name,emailid} = req.params.name;
+        const customer = await Customers.findOne({name,emailid});
+        if(!customer) {
+            return res.status(404).json({
+                status:'unsuccessfull',
+                message:`customer with ${name} and ${emailid} does not exist`
+            })
+        }
+        let updatename = req.body.name ?? customer.name;
+        let updateemail = req.body.emailid ?? customer.emailid;
+        const updateData = {
+            ...req.body,
+            name:updatename,
+            emailid:updateemail,
+            service:customer.service,
+        }
+        const updateCustomers = await Customers.findByIdAndUpdate(
+            {name},
+            {$set:updateData},
+            {new:true,runValidators:true}
+        )
+        res.status(201).json({
+            status:'success',
+            updateCustomers,
+        })
+    }catch(error) {
+        res.status(500).json({
+            status:'unsuccessful',
+            error,
+        })
+    }
 }
 exports.addOwner = async(req,res,next)=>{
     try{
@@ -170,6 +324,7 @@ exports.getOwner = async(req,res,next)=>{
         })
     }
 }
+//----------------------------SALES-CONTROLLER----------------------------//
 exports.addSales = async(req,res,next)=>{
    try{
     const {ProductName} = req.body;
@@ -236,61 +391,14 @@ exports.getSaleReportBydate = async(req,res,next)=>{
         })
     }
 }
-exports.getFormattedDateTime = ()=>{
-    const now  = new Date();
-    const date = now.getDate().toString().padStart(2,'0');
-    const month = (now.getMonth()+1).toString().padStart(2,'0');
-    const year = now.getFullYear();
-    const hours = now.getHours().toString().padStart(2,'0');
-    const minutes = now.getMinutes().toString().padStart(2,'0');
-    return `${date}/${month}/${year}  ${hours}:${minutes}`;
-}
-exports.patchCredit  = async(req,res,next)=>{
-    try{
-     const updateData = {
-        ...req.body,
-        updatedAt:this.getFormattedDateTime()
-     }
-     const updatecredit  = await CreditModel.findByIdAndUpdate({name,date},{$set:req.body},{runValidators:true});
-     if(!credit) {
-        return res.status(404).json({status:'unsuccessful',message:'user not found'});
-     }    
-     res.status(201).json({
-        status:'success',
-        credit
-     })
-    }
-    catch(error) {
-        res.status(500).json({
-            status:'unsucessful',
-            error,
-        })
-    }
-}
-exports.deleteCredit = async(req,res,next)=>{
-   try{
-    const {name,date} = req.params;
-    const deleteCredit = await CreditModel.findByIdAndDelete({name,date});
-    if(!deleteCredit) {
-        return res.status(500).json({status:'unsuccess',message:'user not found'});
-    }
-    res.status(201).json({
-        status:'unsuccessfull',
-        message:`the record for ${name} and ${date} is deleted`
-    })
-    }
-    catch(error) {
-        res.status(500).json({
-            status:'unsuccessful',
-            error
-        })
-    }
-}
+
+
+
 exports.patchSales = async(req,res,next)=>{
     try{
         const {name,date} = req.params;
         const updatedData = {...req.body,updatedAt}
-        const UpdateSales  = await Sale.findByIdAndUpdate({name,date});
+        const UpdateSales  = await Sale.findByIdAndUpdate({name,date},{$set:updatedData},{new:true,runValidators:true});
         if(!UpdateSales) {
             return res.status(404).json({
                 status:'unsuccessful',

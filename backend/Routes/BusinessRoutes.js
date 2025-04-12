@@ -9,6 +9,14 @@ router.route('/getCustomers').get(Controller1.getCustomers);
 router.route('/addCustomers').post(Controller1.addCustomers);
 router.route('/addSales').post(Controller1.addSales);
 router.route('/getSaleBydate').get(Controller1.getSaleReportBydate);
-router.patch('/updateCredit').patch(Controller1.patchCredit);
-router.delete('/deleteCredit').delete(Controller1.deleteCredit);
+router.route('/updateCredit/:name/:date').patch(Controller1.patchCredit);
+router.route('/deleteCredit/:name/:date/:time').delete(Controller1.deleteCredit);
 module.exports = router;
+//nest js->node js environment//python->flask,django+postgresql->database, bangalore=:>django,fast api
+//lot of internship opps
+//faster//
+//node js has great scalability
+//ml , ds-no
+//corporate->
+//dsa , project->understand,quant and verbal ability//
+//you can do m

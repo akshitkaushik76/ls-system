@@ -24,6 +24,9 @@ const Products = new mongoose.Schema({
         
         type:Number,
         required:[true,'please enter the total cost spent to buy the item for buisness']
+    },
+    updatedAt:{
+        type:String
     }
 })
 const products = mongoose.model('Product',Products);
