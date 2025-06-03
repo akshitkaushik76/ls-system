@@ -215,13 +215,15 @@ exports.getProducts = async(req,res,next)=>{
     try{
      const {name,date,time} = req.params;
      console.log(name,date,time);
+     const existingCredit = await CreditModel.findOne({recipient_name:name,issued:date,time:time});
+     console.log(existingCredit);
      const deleteCredit = await CreditModel.findOneAndDelete({recipient_name:name,issued:date,time:time});
      if(!deleteCredit) {
          return res.status(500).json({status:'unsuccess',message:'user not found'});
      }
      res.status(201).json({
          status:'successfull',
-         message:`the record for ${name} and ${date} is deleted`
+         message:`the credit of ${name} on ${date} at ${time} has been settled successfully`
      })
      }
      catch(error) {
