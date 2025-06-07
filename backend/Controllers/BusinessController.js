@@ -15,6 +15,97 @@ const getFormattedDateTime = ()=>{
     const minutes = now.getMinutes().toString().padStart(2,'0');
     return `${date}/${month}/${year}  ${hours}:${minutes}`;
 }
+const NormaliseNames = (productName)=>{
+    productName = productName.toLowerCase();
+    productName = productName.trim();
+    return productName.replace(/\s+/g, ' ');
+}
+function jaroWinkler(s1,s2) {
+ const normalizedS1 = NormaliseNames(s1);
+ const normalizedS2 = NormaliseNames(s2);
+ const m = matchingCharacters(normalizedS1, normalizedS2);
+ if(m == 0) return 0;
+ const t = getTranspostitions(normalizedS1,normalizedS2)/2;
+ const jaro = (m/normalizedS1.length + m/normalizedS2.length+(m-t)/m)/3;
+ let prefix = 0;
+ for(let i = 0; i <Math.min(4,normalizedS1.length,normalizedS2.length);i++) {
+    if(normalizedS1[i] === normalizedS2[i]) {
+        prefix++;
+    }
+    else break;
+ }
+ return jaro+(prefix*0.1*(1-jaro));
+}
+
+function matchingCharacters(s1,s2) {
+    const matchWindow = Math.floor(Math.max(s1.length,s2.length)/2)-1;
+    let matches = 0;
+    const s2matches = [];
+    for(let i = 0;i<s1.length;i++) {
+        const start = Math.max(0,i-matchWindow);
+        const end = Math.min(i+ matchWindow+1,s2.length);
+        for(let j = start;j < end;j++) {
+            if(!s2matches[j] && s1[i] === s2[j]) {
+                s2matches[j] = true;
+                matches++;
+                break;
+            }
+        }
+    }
+    return matches;
+}
+
+function getTranspostitions(s1,s2) {
+    const matchWindow = Math.floor(Math.max(s1.length,s2.length)/2)-1;
+    const s1Matches = [];
+    const s2Matches = [];
+    for(let i = 0;i<s1.length;i++) {
+        const start = Math.max(0,i-matchWindow);
+        const end = Math.min(i + matchWindow+1,s2.length);
+        for(let j = start;j<end;j++) {
+            if(!s2Matches[j] && s1[i] === s2[j]) {
+                s1Matches[i] = s1[i];
+                s2Matches[j] = s2[j];
+                break;
+            }
+        }
+    }
+    let k = 0,transpositions = 0;
+    for(let i = 0;i<s1Matches.length;i++) {
+        if(s1Matches[i]) {
+            while(!s2Matches[k]) k++;
+            if(s1Matches[i] !== s2Matches[k]) transpositions++;
+            k++
+        }
+    }
+    return transpositions;
+}
+
+async function getTotalCredits(email) {
+    const name = await Customers.findOne({emailid:email});
+    if(!name) {
+        return res.status(404).json({
+            status:'fail',
+            message:'customer not found'
+        })
+    }
+    const result  =  await CreditModel.aggregate([
+        {$match:{recipient_name:name.name}},
+        {$group:{
+            _id:null,
+            totalCredits:{$sum:"$totalCost"},
+            totalTransactions:{$sum:1}
+        }},
+        { $project:{
+            _id:0,
+            totalCredits:1,
+            totalTransactions:1,
+            
+        }}
+         
+    ])
+  return result[0];
+}
 //---------PRODUCT CONTROLLERS---------------------------//
 exports.addProduct =  async (req,res,next)=>{
    try{
@@ -149,13 +240,15 @@ exports.getProducts = async(req,res,next)=>{
             })
         }
          console.log(customer.emailid);
+         const totalCreditsSofar = await getTotalCredits(customer.emailid);
+            console.log("total credits so far:",totalCreditsSofar);
         if(customer && customer.emailid) {
             console.log('enters here:', process.env.email_user,process.env.email_password);
             await transporter.sendMail({
                 from:process.env.email_user,
                 to:customer.emailid,
                 subject:'credit added information',
-                text:`Dear ${recipient_name},\n\n A new credit has been added for your product:\n ${product}\n Quantity: ${quantity}\n Total Cost: ${totalCost}\n\n, ${getFormattedDateTime()}, Thank you`
+                text:`Dear ${recipient_name},\n\n A new credit has been added for your recent purchase:\n ${product}\n Quantity: ${quantity}\n Total Cost: ${totalCost}\n\n,Total Credits So far: ${totalCreditsSofar.totalCredits}\n\n, Total Transactions:${totalCreditsSofar.totalTransactions} \n\n,${getFormattedDateTime()}, Thank you`
             })
         }
         res.status(201).json({
