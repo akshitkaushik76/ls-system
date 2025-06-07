@@ -5,6 +5,7 @@ const Customers = require('../models/Customermodel');
 const Unreg = require('../models/Unregcustmodel');
 const Owner = require('../models/OwnerModel');
 const Sale = require('../models/Salesmodel');
+const transporter = require('../Utils/email');
 const getFormattedDateTime = ()=>{
     const now  = new Date();
     const date = now.getDate().toString().padStart(2,'0');
@@ -112,6 +113,7 @@ exports.getProducts = async(req,res,next)=>{
             status:'unsuccessfull',
             error
         })
+
     }
  }
 
@@ -119,7 +121,7 @@ exports.getProducts = async(req,res,next)=>{
  exports.addCredit = async(req,res,next)=>{
     try{
         const {recipient_name,product,quantity} = req.body;
-        console.log(product)
+        //console.log(product)
         const Prod = await Product.findOne({ProductName:product});
         console.log(Prod);
         if(!Prod) {
@@ -139,6 +141,23 @@ exports.getProducts = async(req,res,next)=>{
             totalCost,
             
         })
+        const customer = await Customers.findOne({name:recipient_name});
+        if(!customer) {
+            return res.status(404).json({
+                status:'failure',
+                message:'customer does not exist'
+            })
+        }
+         console.log(customer.emailid);
+        if(customer && customer.emailid) {
+            console.log('enters here:', process.env.email_user,process.env.email_password);
+            await transporter.sendMail({
+                from:process.env.email_user,
+                to:customer.emailid,
+                subject:'credit added information',
+                text:`Dear ${recipient_name},\n\n A new credit has been added for your product:\n ${product}\n Quantity: ${quantity}\n Total Cost: ${totalCost}\n\n, ${getFormattedDateTime()}, Thank you`
+            })
+        }
         res.status(201).json({
             status:'success',
             data
@@ -146,7 +165,7 @@ exports.getProducts = async(req,res,next)=>{
     }catch(error) {
         res.status(500).json({
             status:'fail',
-            error
+            error:error.message
         })
     } 
  }
