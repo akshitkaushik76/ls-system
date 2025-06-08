@@ -80,7 +80,52 @@ function getTranspostitions(s1,s2) {
     }
     return transpositions;
 }
-
+async function getClosestName(Name) {
+    let name = await Customers.find({},'name emailid');
+    let bestScore = 0;
+    let real;
+    for(const nm of name) {
+        const s1  = NormaliseNames(Name);
+        const s2  = NormaliseNames(nm.name);
+        const score = jaroWinkler(s1,s2);
+        if(score > bestScore) {
+            bestScore = score;
+            real = nm;
+        }
+    }
+    console.log(real);
+    if(bestScore > 0.8)  return real;
+    else{
+        return res.status(404).json({
+            status:'fail',
+            message:`no match found for ${name}`
+        })
+    }
+}
+async function getClosestProduct(inputProduct) {
+    const ProductsinDb  = await Product.find({},'ProductName perheadCost sellingPrice');
+    let bestScore = 0;
+    
+    let real;
+    for(const prod of ProductsinDb) {
+        const s1 = NormaliseNames(inputProduct);
+        const s2 = NormaliseNames(prod.ProductName);
+        const score = jaroWinkler(s1,s2);
+        if(score > bestScore) {
+            bestScore = score;
+          
+            real = prod;
+        } 
+    }
+    console.log(real);
+    if(bestScore > 0.8) return real;
+    else{
+        return res.status(404).json({
+            status:'fail',
+            message:`no match found for ${inputProduct}`
+        })
+    }
+}
 async function getTotalCredits(email) {
     const name = await Customers.findOne({emailid:email});
     if(!name) {
@@ -152,9 +197,51 @@ exports.addProduct =  async (req,res,next)=>{
     })
    }
 }
+// exports.getClosestProduct = async(req,res,next)=> {
+//     try{
+//         const inputProduct = req.params.name;
+//         const Productsindb = await Product.find({},'ProductName perheadCost sellingPrice');
+//         let bestScore = 0;
+//         let bestMatch = null;
+//         let real;
+//         for(const prod of Productsindb) {
+//             const s1 = NormaliseNames(inputProduct);
+//             const s2 = NormaliseNames(prod.ProductName);
+//             const score = jaroWinkler(s1,s2);
+//             if(score>bestScore) {
+//                 bestScore = score;
+//                 bestMatch = prod.ProductName;
+//                 real = prod;
+//             }
+//         }
+//         console.log(real);
+//         const perheadCost = real.perheadCost;
+//         if(bestScore < 0.8) {
+//             return res.status(404).json({
+//                 status:'fail',
+//                 message:`no close match found for ${inputProduct}`
+//             })
+//         }
+//         else{
+//             return res.status(200).json({
+//                 status:'success',
+//                 message:`the closest match for ${inputProduct} is ${bestMatch}, perhead cost : ${perheadCost}`,
+//                 data:real
+//             })
+//         }
+
+//     }catch(error) {
+//         return res.status(500).json({
+//             status:'fail',
+//             error:error.message
+//         })
+//     }
+// }
+
 exports.getProducts = async(req,res,next)=>{
     try{
-        const product = await Product.find();
+        let product = await Product.find();
+        
         res.status(201).json({
             status:'success',
             data:product,
@@ -168,7 +255,14 @@ exports.getProducts = async(req,res,next)=>{
  exports.patchProducts = async(req,res,next)=>{
     try{
         const {ProductName} = req.params;
-        const product = await Product.findOne({ProductName});
+        let product = await Product.findOne({ProductName});
+        if(!product) {
+            const closest = await getClosestProduct(ProductName);
+            if(!closest || !closest.sellingPrice || !closest.perheadCost) {
+                return ;
+            }
+            product = closest;
+        }
         console.log(product);
         if(!product) {
             return res.status(404).json({
@@ -213,33 +307,39 @@ exports.getProducts = async(req,res,next)=>{
     try{
         const {recipient_name,product,quantity} = req.body;
         //console.log(product)
-        const Prod = await Product.findOne({ProductName:product});
+       
+        let Prod = await Product.findOne({ProductName:product});
         console.log(Prod);
         if(!Prod) {
-            return res.status(404).json({
-                status:'fail',
-                message:'please enter the product first',
-            })
+            const closestProduct = await getClosestProduct(product);
+            if(!closestProduct || !closestProduct.sellingPrice || !closestProduct.perheadCost) {
+                return ;
+            }
+            Prod  = closestProduct;
+            console.log("closest product is :", Prod);
         }
-
+        let customer = await Customers.findOne({name:recipient_name});
+        if(!customer) {
+            const closestCustomer = await getClosestName(recipient_name);
+            if(!closestCustomer || !closestCustomer.emailid) {
+                return ;
+            }
+            customer = closestCustomer;
+            console.log("closest customer is:",customer);
+        }
+         console.log(customer.emailid);
+         console.log(customer.name);
         
         const Sellingprice = Prod.sellingPrice;
         const totalCost = quantity*Sellingprice;
         const data = await CreditModel.create({
-            recipient_name,
-            product,
+            recipient_name:customer.name,
+            product:Prod.ProductName,
             quantity,
             totalCost,
             
         })
-        const customer = await Customers.findOne({name:recipient_name});
-        if(!customer) {
-            return res.status(404).json({
-                status:'failure',
-                message:'customer does not exist'
-            })
-        }
-         console.log(customer.emailid);
+        
          const totalCreditsSofar = await getTotalCredits(customer.emailid);
             console.log("total credits so far:",totalCreditsSofar);
         if(customer && customer.emailid) {
@@ -248,7 +348,7 @@ exports.getProducts = async(req,res,next)=>{
                 from:process.env.email_user,
                 to:customer.emailid,
                 subject:'credit added information',
-                text:`Dear ${recipient_name},\n\n A new credit has been added for your recent purchase:\n ${product}\n Quantity: ${quantity}\n Total Cost: ${totalCost}\n\n,Total Credits So far: ${totalCreditsSofar.totalCredits}\n\n, Total Transactions:${totalCreditsSofar.totalTransactions} \n\n,${getFormattedDateTime()}, Thank you`
+                text:`Dear ${customer.name},\n\n A new credit has been added for your recent purchase:\n ${Prod.ProductName}\n Quantity: ${quantity}\n Total Cost: ${totalCost}\n\n,Total Credits So far: ${totalCreditsSofar.totalCredits}\n\n, Total Transactions:${totalCreditsSofar.totalTransactions} \n\n,${getFormattedDateTime()}, Thank you`
             })
         }
         res.status(201).json({
@@ -265,6 +365,7 @@ exports.getProducts = async(req,res,next)=>{
  exports.getCredits = async(req,res,next)=>{
     try{
         const data = await CreditModel.find();
+        
         res.status(201).json({
             status:'success',
             data,
