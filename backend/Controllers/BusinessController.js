@@ -362,11 +362,21 @@ exports.getProducts = async(req,res,next)=>{
         })
     } 
  }
- exports.getCredits = async(req,res,next)=>{
+ exports.getCreditsByName = async(req,res,next)=>{
     try{
-        const data = await CreditModel.find();
+        let name = req.params.name;
+        const Record = await Customers.findOne({name});
+        if(!Record) {
+            const closest = await getClosestName(name);
+            if(!closest) {
+                return ;
+            }
+            name = closest.name;
+        }
+        console.log(name);
+        const data = await CreditModel.find({recipient_name:name});
         
-        res.status(201).json({
+        res.status(200).json({
             status:'success',
             data,
         })
@@ -424,27 +434,70 @@ exports.getProducts = async(req,res,next)=>{
      })
     }
  }
- exports.deleteCredit = async(req,res,next)=>{
+ exports.settleCredit = async(req,res,next)=>{
     try{
-     const {name,date,time} = req.params;
-     console.log(name,date,time);
-     const existingCredit = await CreditModel.findOne({recipient_name:name,issued:date,time:time});
-     console.log(existingCredit);
-     const deleteCredit = await CreditModel.findOneAndDelete({recipient_name:name,issued:date,time:time});
-     if(!deleteCredit) {
-         return res.status(500).json({status:'unsuccess',message:'user not found'});
-     }
-     res.status(201).json({
-         status:'successfull',
-         message:`the credit of ${name} on ${date} at ${time} has been settled successfully`
-     })
-     }
-     catch(error) {
-         res.status(500).json({
-             status:'unsuccessful',
-             error
-         })
-     }
+        let {recipient_name,amount} = req.body;
+        let customer = await Customer.findOne({name:recipient_name});
+        if(!customer) {
+            const closest = await getClosestName(recipient_name);
+            if(!closest || !closest.emailid) {
+                return ;
+            }
+            recipient_name = closest.name;
+        }
+        console.log(recipient_name);
+        let sum = Number(amount);
+        let credits = await CreditModel.find({recipient_name}).sort({issued:1,time:1});
+        let response = [];
+        for(let credit of credits) {
+            if(sum<=0) break;
+            if(sum>=credit.totalCost) {
+                sum-=credit.totalCost;
+                await CreditModel.findByIdAndUpdate(credit._id,{totalCost:0,status:'paid'});
+                response.push({
+                    recipient_name:credit.recipient_name,
+                    product:credit.product,
+                    quantity:credit.quantity,
+                    date:credit.issued,
+                    time:credit.time,
+                    status:'paid',
+                });
+            } else {
+                await CreditModel.findByIdAndUpdate(credit._id,{
+                    totalCost:credit.totalCost-sum,
+                    status:'partially paid',
+                });
+                response.push({
+                    recipient_name:credit.recipient_name,
+                    product:credit.product,
+                    quantity:credit.quantity,
+                    date:credit.issued,
+                    time:credit.time,
+                    status:'partially paid'
+                });
+                sum = 0;
+            }
+        }
+        if(customer && customer.emailid) {
+            await transporter.sendMail({
+                from:process.env.email_user,
+                to:customer.emailid,
+                subject:'Credit Settlement Confirmation',
+                text:`Dear ${recipient_name},\n\nYour credit settlement is successful.\nDetails:\n${response.map(r=> `Product:${r.product}, Quantity:${r.quantity}, Date:${r.date}, Time:${r.time},Status:${r.status}`).join('\n')}`
+            })
+        }
+        res.status(200).json({
+            status:'success',
+            message:`settlement of ${recipient_name} is successful`,
+            details:response
+        });
+
+    }catch(error) {
+        res.status(500).json({
+            status:'failure',
+            error:error.message
+        })
+    }
  }
  //----------------------- CUSTOMERS-CONTROLLERS OWNER-CONTROLLERS -------------------------//
  exports.addCustomers = async(req,res,next)=>{
