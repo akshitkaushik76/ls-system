@@ -6,6 +6,7 @@ const Unreg = require('../models/Unregcustmodel');
 const Owner = require('../models/OwnerModel');
 const Sale = require('../models/Salesmodel');
 const transporter = require('../Utils/email');
+
 const getFormattedDateTime = ()=>{
     const now  = new Date();
     const date = now.getDate().toString().padStart(2,'0');
@@ -15,11 +16,22 @@ const getFormattedDateTime = ()=>{
     const minutes = now.getMinutes().toString().padStart(2,'0');
     return `${date}/${month}/${year}  ${hours}:${minutes}`;
 }
+
+
+const toISODateString = (dateStr) =>{
+    const [d,m,y] = dateStr.split('-');
+    return `${y}-${m}-${d}`;
+}
+
+//----------------------------------------------------------------------------------------------------//
+
 const NormaliseNames = (productName)=>{
     productName = productName.toLowerCase();
     productName = productName.trim();
     return productName.replace(/\s+/g, ' ');
 }
+
+//==================================================================================================================//
 function jaroWinkler(s1,s2) {
  const normalizedS1 = NormaliseNames(s1);
  const normalizedS2 = NormaliseNames(s2);
@@ -36,7 +48,7 @@ function jaroWinkler(s1,s2) {
  }
  return jaro+(prefix*0.1*(1-jaro));
 }
-
+//==========================================================================================================================================
 function matchingCharacters(s1,s2) {
     const matchWindow = Math.floor(Math.max(s1.length,s2.length)/2)-1;
     let matches = 0;
@@ -54,7 +66,7 @@ function matchingCharacters(s1,s2) {
     }
     return matches;
 }
-
+//====================================================================================================================//
 function getTranspostitions(s1,s2) {
     const matchWindow = Math.floor(Math.max(s1.length,s2.length)/2)-1;
     const s1Matches = [];
@@ -80,6 +92,8 @@ function getTranspostitions(s1,s2) {
     }
     return transpositions;
 }
+
+//---------------------------------------------------------------------------------------------------------------------------------//
 async function getClosestName(Name) {
     let name = await Customers.find({},'name emailid');
     let bestScore = 0;
@@ -102,6 +116,8 @@ async function getClosestName(Name) {
         })
     }
 }
+
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------//
 async function getClosestProduct(inputProduct) {
     const ProductsinDb  = await Product.find({},'ProductName perheadCost sellingPrice');
     let bestScore = 0;
@@ -126,6 +142,9 @@ async function getClosestProduct(inputProduct) {
         })
     }
 }
+
+//=======================================================================================================================================================================//
+
 async function getTotalCredits(email) {
     const name = await Customers.findOne({emailid:email});
     if(!name) {
@@ -151,6 +170,10 @@ async function getTotalCredits(email) {
     ])
   return result[0];
 }
+
+
+
+
 //---------PRODUCT CONTROLLERS---------------------------//
 exports.addProduct =  async (req,res,next)=>{
    try{
@@ -237,7 +260,7 @@ exports.addProduct =  async (req,res,next)=>{
 //         })
 //     }
 // }
-
+//--------------------------------------------------------------------------------------------------------------------//
 exports.getProducts = async(req,res,next)=>{
     try{
         let product = await Product.find();
@@ -252,6 +275,9 @@ exports.getProducts = async(req,res,next)=>{
         })
     }
  }
+
+//--------------------------------------------------------------------------------------------------------------------------------//
+
  exports.patchProducts = async(req,res,next)=>{
     try{
         const {ProductName} = req.params;
@@ -362,6 +388,9 @@ exports.getProducts = async(req,res,next)=>{
         })
     } 
  }
+
+//-----------------------------------------------------------------------------------------------------------------------------------------------------//
+
  exports.getCreditsByName = async(req,res,next)=>{
     try{
         let name = req.params.name;
@@ -388,6 +417,9 @@ exports.getProducts = async(req,res,next)=>{
         })
     }
  }
+
+//------------------------------------------------------------------------------------------------------------------------------------------------------//
+
  exports.patchCredit  = async(req,res,next)=>{
     try{
      const {name,date} = req.params;
@@ -434,10 +466,13 @@ exports.getProducts = async(req,res,next)=>{
      })
     }
  }
+
+//--------------------------------------------------------------------------------------------------------------------------------------------//
+
  exports.settleCredit = async(req,res,next)=>{
     try{
         let {recipient_name,amount} = req.body;
-        let customer = await Customer.findOne({name:recipient_name});
+        let customer = await Customers.findOne({name:recipient_name});
         if(!customer) {
             const closest = await getClosestName(recipient_name);
             if(!closest || !closest.emailid) {
@@ -446,14 +481,22 @@ exports.getProducts = async(req,res,next)=>{
             recipient_name = closest.name;
         }
         console.log(recipient_name);
+        customer = await Customers.findOne({recipient_name});
+        console.log(customer);
         let sum = Number(amount);
-        let credits = await CreditModel.find({recipient_name}).sort({issued:1,time:1});
+    
+        let credits = await CreditModel.find({recipient_name});
+        credits = credits.sort((a,b)=>{
+            const dateA = toISODateString(a.issued)+(a.time || '');
+            const dateB = toISODateString(b.issued)+(b.time || '');
+            return dateA.localeCompare(dateB);
+        })
         let response = [];
         for(let credit of credits) {
             if(sum<=0) break;
             if(sum>=credit.totalCost) {
                 sum-=credit.totalCost;
-                await CreditModel.findByIdAndUpdate(credit._id,{totalCost:0,status:'paid'});
+                await CreditModel.findByIdAndUpdate(credit._id,{$set:{totalCost:0,status:'paid'}},{new:true,runValidators:true});
                 response.push({
                     recipient_name:credit.recipient_name,
                     product:credit.product,
@@ -478,13 +521,14 @@ exports.getProducts = async(req,res,next)=>{
                 sum = 0;
             }
         }
+        
         if(customer && customer.emailid) {
             await transporter.sendMail({
                 from:process.env.email_user,
                 to:customer.emailid,
                 subject:'Credit Settlement Confirmation',
                 text:`Dear ${recipient_name},\n\nYour credit settlement is successful.\nDetails:\n${response.map(r=> `Product:${r.product}, Quantity:${r.quantity}, Date:${r.date}, Time:${r.time},Status:${r.status}`).join('\n')}`
-            })
+            });
         }
         res.status(200).json({
             status:'success',
@@ -515,9 +559,18 @@ exports.getProducts = async(req,res,next)=>{
         })
     }
  }
- exports.getCustomers = async(req,res,next)=>{
+ exports.getCustomersByname = async(req,res,next)=>{
    try{
-    const data = await Customers.find();
+    const Name = req.params.name;
+    let data = await Customers.findOne(Name);
+    if(!data) {
+        const closest = await getClosestName(req.params.name);
+        if(!closest) {
+            return;
+        }
+        Name = closest.name;
+    }
+    data  = await Customers.findOne({Name});
     res.status(201).json({
        status:'success',
        data,
