@@ -108,7 +108,7 @@ async function getClosestName(Name) {
         }
     }
     console.log(real);
-    if(bestScore > 0.8)  return real;
+    if(bestScore > 0.9)  return real;
     else{
         return res.status(404).json({
             status:'fail',
@@ -119,7 +119,7 @@ async function getClosestName(Name) {
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------//
 async function getClosestProduct(inputProduct) {
-    const ProductsinDb  = await Product.find({},'ProductName perheadCost sellingPrice');
+    const ProductsinDb  = await Product.find({},'ProductName perheadCost sellingPrice Quantity');
     let bestScore = 0;
     
     let real;
@@ -134,7 +134,7 @@ async function getClosestProduct(inputProduct) {
         } 
     }
     console.log(real);
-    if(bestScore > 0.8) return real;
+    if(bestScore > 0.3) return real;
     else{
         return res.status(404).json({
             status:'fail',
@@ -333,7 +333,7 @@ exports.getProducts = async(req,res,next)=>{
     try{
         const {recipient_name,product,quantity} = req.body;
         //console.log(product)
-       
+        console.log(quantity)
         let Prod = await Product.findOne({ProductName:product});
         console.log(Prod);
         if(!Prod) {
@@ -344,6 +344,7 @@ exports.getProducts = async(req,res,next)=>{
             Prod  = closestProduct;
             console.log("closest product is :", Prod);
         }
+        console.log(Prod);
         let customer = await Customers.findOne({name:recipient_name});
         if(!customer) {
             const closestCustomer = await getClosestName(recipient_name);
@@ -358,6 +359,8 @@ exports.getProducts = async(req,res,next)=>{
         
         const Sellingprice = Prod.sellingPrice;
         const totalCost = quantity*Sellingprice;
+        const remaining = Number(Prod.Quantity)-Number(quantity);
+        console.log(remaining);
         const data = await CreditModel.create({
             recipient_name:customer.name,
             product:Prod.ProductName,
@@ -365,6 +368,7 @@ exports.getProducts = async(req,res,next)=>{
             totalCost,
             
         })
+        await Product.findOneAndUpdate({ProductName:Prod.ProductName},{$set:{Quantity:remaining}},{new:true});
         
          const totalCreditsSofar = await getTotalCredits(customer.emailid);
             console.log("total credits so far:",totalCreditsSofar);
@@ -481,11 +485,12 @@ exports.getProducts = async(req,res,next)=>{
             recipient_name = closest.name;
         }
         console.log(recipient_name);
-        customer = await Customers.findOne({recipient_name});
+        customer = await Customers.findOne({name:recipient_name});
         console.log(customer);
         let sum = Number(amount);
     
         let credits = await CreditModel.find({recipient_name});
+        console.log(credits);
         credits = credits.sort((a,b)=>{
             const dateA = toISODateString(a.issued)+(a.time || '');
             const dateB = toISODateString(b.issued)+(b.time || '');
@@ -503,6 +508,7 @@ exports.getProducts = async(req,res,next)=>{
                     quantity:credit.quantity,
                     date:credit.issued,
                     time:credit.time,
+                    paytime:getFormattedDateTime(),
                     status:'paid',
                 });
             } else {
@@ -516,6 +522,7 @@ exports.getProducts = async(req,res,next)=>{
                     quantity:credit.quantity,
                     date:credit.issued,
                     time:credit.time,
+                    paytime:getFormattedDateTime(),
                     status:'partially paid'
                 });
                 sum = 0;
@@ -527,7 +534,7 @@ exports.getProducts = async(req,res,next)=>{
                 from:process.env.email_user,
                 to:customer.emailid,
                 subject:'Credit Settlement Confirmation',
-                text:`Dear ${recipient_name},\n\nYour credit settlement is successful.\nDetails:\n${response.map(r=> `Product:${r.product}, Quantity:${r.quantity}, Date:${r.date}, Time:${r.time},Status:${r.status}`).join('\n')}`
+                text:`Dear ${recipient_name},\n\nYour credit settlement is successful and paid at ${getFormattedDateTime()}.\nDetails:\n${response.map(r=> `Product:${r.product}, Quantity:${r.quantity}, Date:${r.date}, Time:${r.time},Status:${r.status}`).join('\n')}`
             });
         }
         res.status(200).json({
@@ -561,8 +568,8 @@ exports.getProducts = async(req,res,next)=>{
  }
  exports.getCustomersByname = async(req,res,next)=>{
    try{
-    const Name = req.params.name;
-    let data = await Customers.findOne(Name);
+    let Name = req.params.name;
+    let data = await Customers.findOne({name:Name});
     if(!data) {
         const closest = await getClosestName(req.params.name);
         if(!closest) {
@@ -570,7 +577,7 @@ exports.getProducts = async(req,res,next)=>{
         }
         Name = closest.name;
     }
-    data  = await Customers.findOne({Name});
+    data  = await Customers.findOne({name:Name});
     res.status(201).json({
        status:'success',
        data,
@@ -578,7 +585,7 @@ exports.getProducts = async(req,res,next)=>{
    }catch(error){
      res.status(500).json({
         status:'fail',
-        error
+        error:error.message
      })
    }
 }
@@ -647,24 +654,42 @@ exports.getOwner = async(req,res,next)=>{
     }
 }
 //----------------------------SALES-CONTROLLER----------------------------//
+exports.getCriticalQuantityProducts = async(req,res,next)=>{
+    try{
+        const product = await Product.find({Quantity:{$lt:10}});
+        res.status(200).json({
+            status:'success',
+            product
+        });
+    }
+    catch(error) {
+       res.status(500).json({
+        status:'fail',
+        error:error.message
+       })
+    }
+}
 exports.addSales = async(req,res,next)=>{
    try{
     const {ProductName} = req.body;
     const {number} = req.body;
     console.log("product and quantity is:",ProductName,number);
-    const product = await Product.findOne({ProductName});
+    let product = await Product.findOne({ProductName});
     console.log(product)
     if(!product) {
-        return res.status(404).json({
-            status:'fail',
-            message:'product not found'
-        })
+        const closest = await getClosestName(ProductName);
+        if(!closest) {
+            return ;
+        }
+        product = closest;
     }
+
     console.log(product);
     const cost  = product.perheadCost
     const sell = product.sellingPrice
     const profit = (sell-cost)*number;
     const unit = product.unit
+    const rem = product.Quantity-number;
     const sales = await Sale.create({
         ProductName,
         number,
@@ -672,6 +697,7 @@ exports.addSales = async(req,res,next)=>{
         sell,
         profit,
     })
+    await Product.findByIdAndUpdate(product._id,{$set:{Quantity:rem}},{new:true,runValidators:true});
     res.status(201).json({
         status:'success',
         sales
@@ -739,3 +765,6 @@ exports.patchSales = async(req,res,next)=>{
         })
     } 
 }
+
+
+// buisness logic ends todayyyy!!!!!!!!!!!!! yess!!!!!!!!!!!!!

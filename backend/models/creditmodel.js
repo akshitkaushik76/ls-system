@@ -18,6 +18,11 @@ const Creditschema = new mongoose.Schema({
     totalCost:{
         type:Number
     },
+    status:{
+      type:String,
+      enum:['unpaid','partially paid','paid'],
+      default:'unpaid'
+    },
     issued:{
         type:String,
         default:function() {
