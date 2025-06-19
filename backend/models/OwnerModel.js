@@ -3,6 +3,7 @@ const validator = require('validator');
 const OwnerSchema = new mongoose.Schema({
     name:{
         type:String,
+        unique:[true,'please enter a unique username'],
         required:[true,'please enter your name to proceed'],
     },
     emailid:{

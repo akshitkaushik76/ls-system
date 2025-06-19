@@ -6,6 +6,14 @@ const Unreg = require('../models/Unregcustmodel');
 const Owner = require('../models/OwnerModel');
 const Sale = require('../models/Salesmodel');
 const transporter = require('../Utils/email');
+const customerror = require('../Utils/Customerror');
+
+const asyncerrorhandler = (func)=>{
+    return(req,res,next)=>{
+        func(req,res,next).catch(error => next(error))
+    }
+}
+
 
 const getFormattedDateTime = ()=>{
     const now  = new Date();
@@ -109,12 +117,7 @@ async function getClosestName(Name) {
     }
     console.log(real);
     if(bestScore > 0.9)  return real;
-    else{
-        return res.status(404).json({
-            status:'fail',
-            message:`no match found for ${name}`
-        })
-    }
+   else return null;
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------//
@@ -175,8 +178,8 @@ async function getTotalCredits(email) {
 
 
 //---------PRODUCT CONTROLLERS---------------------------//
-exports.addProduct =  async (req,res,next)=>{
-   try{
+exports.addProduct =  asyncerrorhandler(async (req,res,next)=>{
+   
     const {ProductName} = req.body;
     const {perheadCost} = req.body;
     const {Quantity} = req.body;
@@ -212,14 +215,9 @@ exports.addProduct =  async (req,res,next)=>{
         data
     })
    }
-}
- catch(error) {
-    res.status(500).json({
-        status:'fail',
-        error,
-    })
-   }
-}
+
+ 
+})
 // exports.getClosestProduct = async(req,res,next)=> {
 //     try{
 //         const inputProduct = req.params.name;
@@ -261,25 +259,21 @@ exports.addProduct =  async (req,res,next)=>{
 //     }
 // }
 //--------------------------------------------------------------------------------------------------------------------//
-exports.getProducts = async(req,res,next)=>{
-    try{
+exports.getProducts = asyncerrorhandler(async(req,res,next)=>{
+    
         let product = await Product.find();
         
         res.status(201).json({
             status:'success',
             data:product,
         });
-    }catch(error) {
-        res.status(500).json({
-            error,
-        })
-    }
- }
+   
+ })
 
 //--------------------------------------------------------------------------------------------------------------------------------//
 
- exports.patchProducts = async(req,res,next)=>{
-    try{
+ exports.patchProducts = asyncerrorhandler(async(req,res,next)=>{
+    
         const {ProductName} = req.params;
         let product = await Product.findOne({ProductName});
         if(!product) {
@@ -291,10 +285,8 @@ exports.getProducts = async(req,res,next)=>{
         }
         console.log(product);
         if(!product) {
-            return res.status(404).json({
-                status:'unsuccessfull',
-                message:'product does not exist'
-            })
+           const error = new customerror(`the product with the product name : ${ProductName} is not found`,404);
+           next(error);
         }
         let updateQuantity = req.body.Quantity ?? product.Quantity;
         let updateName = req.body.ProductName ?? product.ProductName;
@@ -310,7 +302,7 @@ exports.getProducts = async(req,res,next)=>{
             TotalCostSpent:updateQuantity*(product.TotalCostSpent/product.Quantity),
             updatedAt:getFormattedDateTime()
         }
-        const updatedProduct = await Product.findOneAndDeleteUpdate(
+        const updatedProduct = await Product.findOneAndUpdate(
             {ProductName},
             {$set:updatedData},
             {new:true,runValidators:true}
@@ -319,14 +311,8 @@ exports.getProducts = async(req,res,next)=>{
             status:'success',
             updatedProduct
         })
-    }catch(error) {
-        res.status(500).json({
-            status:'unsuccessfull',
-            error
-        })
-
-    }
- }
+    
+ })
 
  //-------------------CREDIT-CONTROLLERS-----------------------------------
  exports.addCredit = async(req,res,next)=>{
@@ -566,14 +552,15 @@ exports.getProducts = async(req,res,next)=>{
         })
     }
  }
- exports.getCustomersByname = async(req,res,next)=>{
-   try{
+ exports.getCustomersByname = asyncerrorhandler(async(req,res,next)=>{
+   
     let Name = req.params.name;
     let data = await Customers.findOne({name:Name});
     if(!data) {
         const closest = await getClosestName(req.params.name);
         if(!closest) {
-            return;
+            const error = new customerror(`customer with name ${Name} is not found`,404);
+            next(error);
         }
         Name = closest.name;
     }
@@ -582,13 +569,8 @@ exports.getProducts = async(req,res,next)=>{
        status:'success',
        data,
     })
-   }catch(error){
-     res.status(500).json({
-        status:'fail',
-        error:error.message
-     })
-   }
-}
+  
+})
 exports.patchCustomers = async(req,res,next)=>{
     try{
         const {name} = req.params.name;
@@ -674,17 +656,18 @@ exports.addSales = async(req,res,next)=>{
     const {ProductName} = req.body;
     const {number} = req.body;
     console.log("product and quantity is:",ProductName,number);
-    let product = await Product.findOne({ProductName});
-    console.log(product)
-    if(!product) {
-        const closest = await getClosestName(ProductName);
-        if(!closest) {
-            return ;
-        }
-        product = closest;
-    }
+    const  product = await Product.findOne({ProductName});
+    // console.log(product)
+    // if(!product) {
+    //     const closest = await getClosestName(ProductName);
+    //     if(!closest) {
+    //         return ;
+    //     }
+    //     product = closest;
+    // }
 
-    console.log(product);
+    // console.log(product);
+    console.log(product)
     const cost  = product.perheadCost
     const sell = product.sellingPrice
     const profit = (sell-cost)*number;
@@ -705,7 +688,7 @@ exports.addSales = async(req,res,next)=>{
    }catch(error) {
     res.status(500).json({
         status:'fail',
-        error
+        error:error.message
     })
    }
 }
@@ -767,4 +750,4 @@ exports.patchSales = async(req,res,next)=>{
 }
 
 
-// buisness logic ends todayyyy!!!!!!!!!!!!! yess!!!!!!!!!!!!!
+// buisness logic ends todayyyy!!!!!!!!!!!!!

@@ -3,7 +3,8 @@ const validator = require('validator');
 const Customer = new mongoose.Schema({
     name:{
         type:String,
-        required:[true,'please enter your name']
+        required:[true,'please enter your name'],
+        unique:[true,'please enter a unique username']
     },
     emailid:{
         type:String,
@@ -14,6 +15,7 @@ const Customer = new mongoose.Schema({
     service:{
         type:String,
         required:[true,'please enter the name of buisness from which you are taking services'],
+        unique:[true,'please enter the correct buisname name for registration and login purposes']
     },
     password:{
         type:String,

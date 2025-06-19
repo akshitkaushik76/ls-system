@@ -19,6 +19,7 @@ const Products = new mongoose.Schema({
     },
     sellingPrice:{
         type:Number,
+        required:[true,'please enter the selling price of the product']
     },
     TotalCostSpent:{
         
