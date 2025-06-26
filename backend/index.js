@@ -4,7 +4,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const CustomError = require('./Utils/Customerror');
 const GlobalErrorHandler = require('./Controllers/ErrorController');
-//const Authrouter = require('../backend/Routes/AuthenticateRoutes');
+const Authrouter = require('../backend/Routes/AuthenticateRoutes');
 const BusinessRouter = require('../backend/Routes/BusinessRoutes');
 const PORT = 5500;
 const app = express();
@@ -12,7 +12,7 @@ app.use(express.json());
 
 console.log(process.env.email_user,process.env.email_password);
 app.use('/api/buisness-manager',BusinessRouter);
-//app.use('/api/auth',Authrouter);
+app.use('/api/buisness-manager',Authrouter);
 app.all('*',(req,res,next)=>{
 //    const error = new Error(`cant find the url: ${req.originalUrl}`);
 //    error.status = 'fail';
@@ -31,5 +31,11 @@ mongoose.connect('mongodb://localhost:27017/buisness-management',{
 }).catch((error)=>{
     console.log("unsuccessful connection error",error);
 })
-
-app.listen(PORT,()=>console.log("app is running on the port:",PORT));
+const server =  app.listen(PORT,()=>console.log("app is running on the port:",PORT));
+process.on('unhandledRejection',(error)=>{
+    console.log("unhandled rejection error",error.message);
+    console.log("shutting down the server");
+    server.close(()=>{
+        process.exit(1);
+    })
+})

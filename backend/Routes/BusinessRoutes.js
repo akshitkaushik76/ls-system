@@ -9,7 +9,7 @@ router.route('/addCredits').post(Controller1.addCredit);
 router.route('/getCredits/:name').get(Controller1.getCreditsByName);
 router.route('/settleCredit').post(Controller1.settleCredit);
 router.route('/getCustomers/:name').get(Controller1.getCustomersByname);
-router.route('/addCustomers').post(Controller1.addCustomers);
+//router.route('/addCustomers').post(Controller1.addCustomers);
 router.route('/addSales').post(Controller1.addSales);
 router.route('/getSaleBydate').get(Controller1.getSaleReportBydate);
 router.route('/updateCredit/:name/:date').patch(Controller1.patchCredit);

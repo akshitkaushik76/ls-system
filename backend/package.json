@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "dev": "cross-env NODE_ENV=development nodemon index.js",
+    "prod": "cross-env NODE_ENV=production nodemon index.js"
   },
   "author": "",
   "license": "ISC",
@@ -15,5 +16,8 @@
     "mongoose": "^8.12.1",
     "nodemailer": "^7.0.3",
     "validator": "^13.12.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3"
   }
 }

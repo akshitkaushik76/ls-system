@@ -7,6 +7,7 @@ const Owner = require('../models/OwnerModel');
 const Sale = require('../models/Salesmodel');
 const transporter = require('../Utils/email');
 const customerror = require('../Utils/Customerror');
+const {getClosestName,getClosestProduct} = require('../Utils/Jaro_Winkler');
 
 const asyncerrorhandler = (func)=>{
     return(req,res,next)=>{
@@ -33,118 +34,6 @@ const toISODateString = (dateStr) =>{
 
 //----------------------------------------------------------------------------------------------------//
 
-const NormaliseNames = (productName)=>{
-    productName = productName.toLowerCase();
-    productName = productName.trim();
-    return productName.replace(/\s+/g, ' ');
-}
-
-//==================================================================================================================//
-function jaroWinkler(s1,s2) {
- const normalizedS1 = NormaliseNames(s1);
- const normalizedS2 = NormaliseNames(s2);
- const m = matchingCharacters(normalizedS1, normalizedS2);
- if(m == 0) return 0;
- const t = getTranspostitions(normalizedS1,normalizedS2)/2;
- const jaro = (m/normalizedS1.length + m/normalizedS2.length+(m-t)/m)/3;
- let prefix = 0;
- for(let i = 0; i <Math.min(4,normalizedS1.length,normalizedS2.length);i++) {
-    if(normalizedS1[i] === normalizedS2[i]) {
-        prefix++;
-    }
-    else break;
- }
- return jaro+(prefix*0.1*(1-jaro));
-}
-//==========================================================================================================================================
-function matchingCharacters(s1,s2) {
-    const matchWindow = Math.floor(Math.max(s1.length,s2.length)/2)-1;
-    let matches = 0;
-    const s2matches = [];
-    for(let i = 0;i<s1.length;i++) {
-        const start = Math.max(0,i-matchWindow);
-        const end = Math.min(i+ matchWindow+1,s2.length);
-        for(let j = start;j < end;j++) {
-            if(!s2matches[j] && s1[i] === s2[j]) {
-                s2matches[j] = true;
-                matches++;
-                break;
-            }
-        }
-    }
-    return matches;
-}
-//====================================================================================================================//
-function getTranspostitions(s1,s2) {
-    const matchWindow = Math.floor(Math.max(s1.length,s2.length)/2)-1;
-    const s1Matches = [];
-    const s2Matches = [];
-    for(let i = 0;i<s1.length;i++) {
-        const start = Math.max(0,i-matchWindow);
-        const end = Math.min(i + matchWindow+1,s2.length);
-        for(let j = start;j<end;j++) {
-            if(!s2Matches[j] && s1[i] === s2[j]) {
-                s1Matches[i] = s1[i];
-                s2Matches[j] = s2[j];
-                break;
-            }
-        }
-    }
-    let k = 0,transpositions = 0;
-    for(let i = 0;i<s1Matches.length;i++) {
-        if(s1Matches[i]) {
-            while(!s2Matches[k]) k++;
-            if(s1Matches[i] !== s2Matches[k]) transpositions++;
-            k++
-        }
-    }
-    return transpositions;
-}
-
-//---------------------------------------------------------------------------------------------------------------------------------//
-async function getClosestName(Name) {
-    let name = await Customers.find({},'name emailid');
-    let bestScore = 0;
-    let real;
-    for(const nm of name) {
-        const s1  = NormaliseNames(Name);
-        const s2  = NormaliseNames(nm.name);
-        const score = jaroWinkler(s1,s2);
-        if(score > bestScore) {
-            bestScore = score;
-            real = nm;
-        }
-    }
-    console.log(real);
-    if(bestScore > 0.9)  return real;
-   else return null;
-}
-
-//------------------------------------------------------------------------------------------------------------------------------------------------------------------//
-async function getClosestProduct(inputProduct) {
-    const ProductsinDb  = await Product.find({},'ProductName perheadCost sellingPrice Quantity');
-    let bestScore = 0;
-    
-    let real;
-    for(const prod of ProductsinDb) {
-        const s1 = NormaliseNames(inputProduct);
-        const s2 = NormaliseNames(prod.ProductName);
-        const score = jaroWinkler(s1,s2);
-        if(score > bestScore) {
-            bestScore = score;
-          
-            real = prod;
-        } 
-    }
-    console.log(real);
-    if(bestScore > 0.3) return real;
-    else{
-        return res.status(404).json({
-            status:'fail',
-            message:`no match found for ${inputProduct}`
-        })
-    }
-}
 
 //=======================================================================================================================================================================//
 
@@ -315,8 +204,8 @@ exports.getProducts = asyncerrorhandler(async(req,res,next)=>{
  })
 
  //-------------------CREDIT-CONTROLLERS-----------------------------------
- exports.addCredit = async(req,res,next)=>{
-    try{
+ exports.addCredit = asyncerrorhandler(async(req,res,next)=>{
+    
         const {recipient_name,product,quantity} = req.body;
         //console.log(product)
         console.log(quantity)
@@ -325,7 +214,8 @@ exports.getProducts = asyncerrorhandler(async(req,res,next)=>{
         if(!Prod) {
             const closestProduct = await getClosestProduct(product);
             if(!closestProduct || !closestProduct.sellingPrice || !closestProduct.perheadCost) {
-                return ;
+                const error = new customerror(`the product with the product name : ${product} is not found or Please enter the product`, 404);
+                next(error);
             }
             Prod  = closestProduct;
             console.log("closest product is :", Prod);
@@ -335,7 +225,8 @@ exports.getProducts = asyncerrorhandler(async(req,res,next)=>{
         if(!customer) {
             const closestCustomer = await getClosestName(recipient_name);
             if(!closestCustomer || !closestCustomer.emailid) {
-                return ;
+                const err = new customerror(`the customer with the name : ${recipient_name} is not found`, 404);
+                next(err)
             }
             customer = closestCustomer;
             console.log("closest customer is:",customer);
@@ -371,24 +262,20 @@ exports.getProducts = asyncerrorhandler(async(req,res,next)=>{
             status:'success',
             data
         })
-    }catch(error) {
-        res.status(500).json({
-            status:'fail',
-            error:error.message
-        })
-    } 
- }
+    
+ })
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------------//
 
- exports.getCreditsByName = async(req,res,next)=>{
-    try{
+ exports.getCreditsByName = asyncerrorhandler(async(req,res,next)=>{
+    
         let name = req.params.name;
         const Record = await Customers.findOne({name});
         if(!Record) {
             const closest = await getClosestName(name);
             if(!closest) {
-                return ;
+                const error = new customerror(`the customer with the name : ${name} is not found`,404);
+                next(error)
             }
             name = closest.name;
         }
@@ -399,28 +286,21 @@ exports.getProducts = asyncerrorhandler(async(req,res,next)=>{
             status:'success',
             data,
         })
-    }
-    catch(error) {
-        res.status(500).json({
-            status:'fail',
-            error
-        })
-    }
- }
+    
+ })
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------//
 
- exports.patchCredit  = async(req,res,next)=>{
-    try{
+ exports.patchCredit  = asyncerrorhandler(async(req,res,next)=>{
+    
      const {name,date} = req.params;
      console.log(name,date);
+     const customer = await Customers.findOne({name});
      const existingCredit = await CreditModel.findOne({recipient_name:name,issued:date});
      console.log(existingCredit)
      if(!existingCredit) {
-         return res.status(404).json({
-             status:'unsuccessful',
-             message:'user not found'
-         });
+        const error = new customerror(`the credit is not found`,404);
+        next(error);
      }
       let updatedQuanted = req.body.quantity ?? existingCredit.quantity;
       let updatedProduct = req.body.product ?? existingCredit.product;
@@ -445,28 +325,33 @@ exports.getProducts = asyncerrorhandler(async(req,res,next)=>{
              new:true,runValidators:true
          }
       );
+       if(customer && customer.emailid) {
+            console.log('enters here:', process.env.email_user,process.env.email_password);
+            await transporter.sendMail({
+                from:process.env.email_user,
+                to:customer.emailid,
+                subject:'credit updated information',
+                text:`dear ${customer.name} , the credit for the purchase ${existingCredit.product } ,quantity: ${existingCredit.quantity} has been updated with ${updatedCredit} at time \n\n,${getFormattedDateTime()}, Sorry for inconvinience. Thank you`
+            })
+        }
       res.status(200).json({
          status:'success',
          credit:updatedCredit
       });
-    }catch(error) {
-     res.status(500).json({
-         status:'unsuccessful',
-         error:error.message
-     })
-    }
- }
+   
+ })
 
 //--------------------------------------------------------------------------------------------------------------------------------------------//
 
- exports.settleCredit = async(req,res,next)=>{
-    try{
+ exports.settleCredit = asyncerrorhandler(async(req,res,next)=>{
+    
         let {recipient_name,amount} = req.body;
         let customer = await Customers.findOne({name:recipient_name});
         if(!customer) {
             const closest = await getClosestName(recipient_name);
             if(!closest || !closest.emailid) {
-                return ;
+                const error = new customerror(`the customer with name ${recipient_name} is not found!`);
+                next(error);
             }
             recipient_name = closest.name;
         }
@@ -529,29 +414,10 @@ exports.getProducts = asyncerrorhandler(async(req,res,next)=>{
             details:response
         });
 
-    }catch(error) {
-        res.status(500).json({
-            status:'failure',
-            error:error.message
-        })
-    }
- }
+    
+ })
  //----------------------- CUSTOMERS-CONTROLLERS OWNER-CONTROLLERS -------------------------//
- exports.addCustomers = async(req,res,next)=>{
-    console.log(req.body);
-    try{
-        const data = await Customers.create(req.body);
-        res.status(201).json({
-            status:'success',
-            data,
-        })
-    }catch(error) {
-        res.status(500).json({
-            status:"not successful",
-            error,
-        })
-    }
- }
+
  exports.getCustomersByname = asyncerrorhandler(async(req,res,next)=>{
    
     let Name = req.params.name;
@@ -571,88 +437,79 @@ exports.getProducts = asyncerrorhandler(async(req,res,next)=>{
     })
   
 })
-exports.patchCustomers = async(req,res,next)=>{
-    try{
-        const {name} = req.params.name;
-        const customer = await Customers.findOne({name});
+exports.patchCustomers = asyncerrorhandler(async(req,res,next)=>{
+    
+        const {name,emailid} = req.params;
+        
+        const customer = await Customers.findOne({emailid});
         console.log(customer)
         if(!customer) {
-            return res.status(404).json({
-                status:'unsuccessfull',
-                message:`customer with ${name} and ${emailid} does not exist`
-            })
+            const error = new customerror(`customer with emailid ${emailid} is not found`, 404);
+            next(error);
         }
         let updatename = req.body.name ?? customer.name;
         let updateemail = req.body.emailid ?? customer.emailid;
+        let updatedService = req.body.service ?? customer.service;
+        
+        console.log(updatedService);
         const updateData = {
             ...req.body,
             name:updatename,
             emailid:updateemail,
-            service:customer.service,
+            service:updatedService,
         }
-        const updateCustomers = await Customers.findByIdAndUpdate(
-            {name},
+        //updating changes in the credit model. this should optional , if at the tine of signup the mistake was done by the user, then the user is supposed to not have any credit record
+        const creditRecord = await CreditModel.find({recipient_name:customer.name});
+        console.log(creditRecord);
+        if(creditRecord) {
+            await CreditModel.updateMany({recipient_name:customer.name},{$set:{recipient_name:updatename}}, {new:true, runValidators:true})
+        }
+        const updateCustomers = await Customers.findOneAndUpdate(
+            {emailid},
             {$set:updateData},
             {new:true,runValidators:true}
         )
+        console.log(updateCustomers);
+        //generate an email response highlighting the changes
+        let changes = Object.keys(req.body).map(key=> `${key} : ${req.body[key]}`).join('\n');
+        if(customer && customer.emailid ) {
+            await transporter.sendMail({
+                from:process.env.email_user,
+                to:customer.emailid,
+                subject:'User information updated!!',
+                text:`Dear ${updatename},\n\nYour account information was updated  at ${getFormattedDateTime()} to the ${changes}\n\n . If u did'nt initiated these changes, then we are still developing the interface!`
+            })
+        }
+        console.log(updateCustomers);
         res.status(201).json({
             status:'success',
             updateCustomers,
         })
-    }catch(error) {
-        res.status(500).json({
-            status:'unsuccessful',
-            error,
-        })
-    }
-}
-exports.addOwner = async(req,res,next)=>{
-    try{
-        const data = await Owner.create(req.body);
-        res.status(201).json({
-            status:'success',
-            data
-        })
-    }
-    catch(error){
-        res.status(500).json({
-            status:'fail',
-            error,
-        })
-    }
-}
-exports.getOwner = async(req,res,next)=>{
-    try{
+    })
+
+
+
+exports.getOwner = asyncerrorhandler(async(req,res,next)=>{
+    
         const data = await Owner.find();
         res.status(201).json({
             status:'success',
             data
         })
-    }catch(error)  {
-        res.status(500).json({
-            status:'fail',
-            error
-        })
-    }
-}
+   
+})
 //----------------------------SALES-CONTROLLER----------------------------//
-exports.getCriticalQuantityProducts = async(req,res,next)=>{
-    try{
+exports.getCriticalQuantityProducts = asyncerrorhandler(async(req,res,next)=>{
+    
         const product = await Product.find({Quantity:{$lt:10}});
         res.status(200).json({
             status:'success',
             product
         });
-    }
-    catch(error) {
-       res.status(500).json({
-        status:'fail',
-        error:error.message
-       })
-    }
-}
-exports.addSales = async(req,res,next)=>{
-   try{
+    
+})
+exports.addSales = asyncerrorhandler(async(req,res,next)=>{
+   
     const {ProductName} = req.body;
     const {number} = req.body;
     console.log("product and quantity is:",ProductName,number);
@@ -685,15 +542,10 @@ exports.addSales = async(req,res,next)=>{
         status:'success',
         sales
     })
-   }catch(error) {
-    res.status(500).json({
-        status:'fail',
-        error:error.message
-    })
-   }
-}
-exports.getSaleReportBydate = async(req,res,next)=>{
-    try{
+   
+})
+exports.getSaleReportBydate = asyncerrorhandler(async(req,res,next)=>{
+    
        const {date} = req.body;
        const result = await Sale.aggregate([
         {$match:{date:date}},
@@ -715,39 +567,26 @@ exports.getSaleReportBydate = async(req,res,next)=>{
         status:'success',
         result
        })
-    } catch(error) {
-        res.status(500).json({
-            status:'fail',
-            error
-        })
-    }
-}
+   
+})
 
 
 
-exports.patchSales = async(req,res,next)=>{
-    try{
+exports.patchSales = asyncerrorhandler(async(req,res,next)=>{
+    
         const {name,date} = req.params;
         const updatedData = {...req.body,updatedAt}
         const UpdateSales  = await Sale.findByIdAndUpdate({name,date},{$set:updatedData},{new:true,runValidators:true});
         if(!UpdateSales) {
-            return res.status(404).json({
-                status:'unsuccessful',
-                message:'the user does not exist'
-            })
+           const error = new customerror(`the sales with ${name} and ${date} is not found`, 404);
+           next(error);
         }
         res.status(201).json({
             status:'success',
             UpdatedDate:UpdateSales
         })
-    }
-    catch(error) {
-        res.status(500).json({
-            status:'unsuccessful',
-            error
-        })
-    } 
-}
+   
+})
 
 
 // buisness logic ends todayyyy!!!!!!!!!!!!!
