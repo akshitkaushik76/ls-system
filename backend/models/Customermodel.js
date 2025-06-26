@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const validator = require('validator');
+const bcrypt  = require('bcryptjs');
+// const jwt = require('jsonwebtokens');
 const Customer = new mongoose.Schema({
     name:{
         type:String,
@@ -20,7 +22,8 @@ const Customer = new mongoose.Schema({
     password:{
         type:String,
         required:[true,'please set the password'],
-        minlength:8
+        minlength:8,
+        select:false
     },
     confirmpassword:{
         type:String,
@@ -33,5 +36,16 @@ const Customer = new mongoose.Schema({
         }
     }
 })
+Customer.pre('save',async function(next){
+    if(!this.isModified('password')) {
+        return next();
+    }
+   this.password = await bcrypt.hash(this.password,12);
+   this.confirmpassword = undefined
+   next();
+})
+Customer.methods.comparePasswordinDb = async function(pswd,pswdDB) {
+    return await bcrypt.compare(pswd,pswdDB);
+}
 const Customers = mongoose.model("customers",Customer);
 module.exports = Customers

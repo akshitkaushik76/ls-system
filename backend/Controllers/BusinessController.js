@@ -585,7 +585,6 @@ exports.patchSales = asyncerrorhandler(async(req,res,next)=>{
             status:'success',
             UpdatedDate:UpdateSales
         })
-   
 })
 
 

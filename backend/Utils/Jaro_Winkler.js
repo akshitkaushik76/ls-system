@@ -84,7 +84,7 @@ async function getClosestName(Name) {
         }
     }
     console.log(real);
-    if(bestScore > 0.8)  return real;
+    if(bestScore > 0.95)  return real;
    else return null;
 }
 
@@ -105,7 +105,7 @@ async function getClosestProduct(inputProduct) {
         } 
     }
     console.log(real);
-    if(bestScore > 0.3) return real;
+    if(bestScore > 0.91) return real;
     else return null;
 }
 module.exports = {
