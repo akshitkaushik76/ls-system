@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const validator = require('validator');
 const bcrypt  = require('bcryptjs');
 // const jwt = require('jsonwebtokens');
+const crypto = require('crypto');
 const Customer = new mongoose.Schema({
     name:{
         type:String,
@@ -35,7 +36,10 @@ const Customer = new mongoose.Schema({
             message:"the password and confirm password does not match"
         }
     },
-    passwordChangedAt:Date
+    passwordChangedAt:Date,
+    passwordResetToken:String,
+    passwordResetTokenExpires:Date
+
 })
 Customer.pre('save',async function(next){
     if(!this.isModified('password')) {
@@ -57,6 +61,14 @@ Customer.methods.isPasswordChanged = async function(JWTTimestamp) {
         return JWTTimestamp < pswdChangedTimestamp;
     }
     return false;
+}
+
+Customer.methods.createResetPasswordToken = function() {
+  const resetToken =  crypto.randomBytes(32).toString('hex');
+  this.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+  this.passwordResetTokenExpires = Date.now() + 10*60*1000;
+  console.log(resetToken,this.passwordResetToken);
+  return resetToken;
 }
 const Customers = mongoose.model("customers",Customer);
 module.exports = Customers

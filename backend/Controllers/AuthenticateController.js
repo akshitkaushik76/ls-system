@@ -4,7 +4,8 @@
  const jwt  = require('jsonwebtoken');
  const util = require('util');
 const {getClosestName} = require('./../Utils/Jaro_Winkler');
-
+const  transporter  = require('../Utils/email');
+const crypto = require('crypto');
 const asyncerrorhandler = (func)=>{
     return(req,res,next)=>{
         func(req,res,next).catch(error => next(error))
@@ -106,5 +107,69 @@ return token;
     next();
  })
 
+ const forgotPassword = (Model)=>asyncerrorhandler(async(req,res,next)=>{
+    console.log(req.body);
+    let route_path = " ";
+    if(Model === Customers) {
+        route_path = "resetPassword1";
+    }
+    else {
+        route_path = "resetPassword2";
+    }
+    console.log(route_path);
+    const user = await Model.findOne({emailid:req.body.emailid});
+    if(!user) {
+        const error = new customerror('the user with the provided email does not exits',404);
+        next(error);
+    }
+    const resetToken = user.createResetPasswordToken();
+    await user.save({validateBeforeSave:false});
+
+    const resetUrl = `${req.protocol}://${req.get('host')}/api/buisness-manager/${route_path}/${resetToken}`;
+    try{
+          await transporter.sendMail({
+                    from:process.env.email_user,
+                    to:req.body.emailid,
+                    subject:'PASSWORD RESET MESSAGE',
+                    text:`dear user!! according to the query raised we are issuing you the reset password link \n\n ${resetUrl} \n\n The URL is valid for 10 mins ! thank you`
+    })
+      res.status(200).json({
+        status:'success',
+        message:'the email was sent successfully'
+      })
+    } catch(error) {
+        user.passwordResetToken  = undefined;
+        user.passwordResetTokenExpires = undefined;
+        user.save({validateBeforeSave:false});
+        return next(new customerror('there was an error sending the email,please try again later',500));
+    }
+ })
+
+const resetPassword = (model)=> asyncerrorhandler(async(req,res,next)=>{
+   
+    const decodedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+    const user = await model.findOne({passwordResetToken:decodedToken,passwordResetTokenExpires:{$gt:Date.now()}});
+    if(!user) {
+        const error = new customerror('the token is invalid or expired',400);
+        next(error);
+    }
+    user.password = req.body.password;
+    user.confirmpassword = req.body.confirmpassword;
+    user.passwordResetToken = undefined;
+    user.passwordResetTokenExpires = undefined;
+    user.passwordChangedAt = Date.now();
+    user.save({validateBeforeSave:true});
+
+    const loginToken = signup_token(user);
+    res.status(200).json({
+        status:'success',
+        TOKEN:loginToken
+    })
+
+})
+ exports.resetPasswordCustomer = resetPassword(Customers);
+ exports.resetPasswordOwner = resetPassword(Owner);
+ exports.forgotPasswordCustomer = forgotPassword(Customers);
+ exports.forgotPasswordOwner = forgotPassword(Owner);
  exports.protectByCustomer = protect(Customers);
  exports.protectByOwner = protect(Owner);
