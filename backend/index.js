@@ -23,11 +23,14 @@ next(error);
 })
 
 app.use(GlobalErrorHandler);
-mongoose.connect('mongodb://localhost:27017/buisness-management',{
+console.log(process.env.connection_string);
+mongoose.connect(process.env.connection_string,{
     useNewUrlParser:true,
     useUnifiedTopology:true
 }).then((conn)=>{
+    console.log(conn);
     console.log("database connected successfully");
+    
 }).catch((error)=>{
     console.log("unsuccessful connection error",error);
 })
