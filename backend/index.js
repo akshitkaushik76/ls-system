@@ -29,7 +29,7 @@ mongoose.connect(process.env.connection_string,{
     useUnifiedTopology:true
 }).then((conn)=>{
     console.log(conn);
-    console.log("database connected successfully");
+    // console.log("database connected successfully");
     
 }).catch((error)=>{
     console.log("unsuccessful connection error",error);
