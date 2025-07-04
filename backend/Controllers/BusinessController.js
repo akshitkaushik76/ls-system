@@ -107,47 +107,10 @@ exports.addProduct =  asyncerrorhandler(async (req,res,next)=>{
 
  
 })
-// exports.getClosestProduct = async(req,res,next)=> {
-//     try{
-//         const inputProduct = req.params.name;
-//         const Productsindb = await Product.find({},'ProductName perheadCost sellingPrice');
-//         let bestScore = 0;
-//         let bestMatch = null;
-//         let real;
-//         for(const prod of Productsindb) {
-//             const s1 = NormaliseNames(inputProduct);
-//             const s2 = NormaliseNames(prod.ProductName);
-//             const score = jaroWinkler(s1,s2);
-//             if(score>bestScore) {
-//                 bestScore = score;
-//                 bestMatch = prod.ProductName;
-//                 real = prod;
-//             }
-//         }
-//         console.log(real);
-//         const perheadCost = real.perheadCost;
-//         if(bestScore < 0.8) {
-//             return res.status(404).json({
-//                 status:'fail',
-//                 message:`no close match found for ${inputProduct}`
-//             })
-//         }
-//         else{
-//             return res.status(200).json({
-//                 status:'success',
-//                 message:`the closest match for ${inputProduct} is ${bestMatch}, perhead cost : ${perheadCost}`,
-//                 data:real
-//             })
-//         }
 
-//     }catch(error) {
-//         return res.status(500).json({
-//             status:'fail',
-//             error:error.message
-//         })
-//     }
-// }
 //--------------------------------------------------------------------------------------------------------------------//
+
+
 exports.getProducts = asyncerrorhandler(async(req,res,next)=>{
     
         let product = await Product.find();
@@ -161,7 +124,8 @@ exports.getProducts = asyncerrorhandler(async(req,res,next)=>{
 
 //--------------------------------------------------------------------------------------------------------------------------------//
 
- exports.patchProducts = asyncerrorhandler(async(req,res,next)=>{
+
+exports.patchProducts = asyncerrorhandler(async(req,res,next)=>{
     
         const {ProductName} = req.params;
         let product = await Product.findOne({ProductName});
@@ -204,6 +168,7 @@ exports.getProducts = asyncerrorhandler(async(req,res,next)=>{
  })
 
  //-------------------CREDIT-CONTROLLERS-----------------------------------
+
  exports.addCredit = asyncerrorhandler(async(req,res,next)=>{
     
         const {recipient_name,product,quantity} = req.body;
@@ -267,7 +232,8 @@ exports.getProducts = asyncerrorhandler(async(req,res,next)=>{
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------------//
 
- exports.getCreditsByName = asyncerrorhandler(async(req,res,next)=>{
+
+exports.getCreditsByName = asyncerrorhandler(async(req,res,next)=>{
     
         let name = req.params.name;
         const Record = await Customers.findOne({name});
@@ -291,7 +257,8 @@ exports.getProducts = asyncerrorhandler(async(req,res,next)=>{
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------//
 
- exports.patchCredit  = asyncerrorhandler(async(req,res,next)=>{
+
+exports.patchCredit  = asyncerrorhandler(async(req,res,next)=>{
     
      const {name,date} = req.params;
      console.log(name,date);
@@ -343,7 +310,8 @@ exports.getProducts = asyncerrorhandler(async(req,res,next)=>{
 
 //--------------------------------------------------------------------------------------------------------------------------------------------//
 
- exports.settleCredit = asyncerrorhandler(async(req,res,next)=>{
+
+exports.settleCredit = asyncerrorhandler(async(req,res,next)=>{
     
         let {recipient_name,amount} = req.body;
         let customer = await Customers.findOne({name:recipient_name});
@@ -418,6 +386,7 @@ exports.getProducts = asyncerrorhandler(async(req,res,next)=>{
  })
  //----------------------- CUSTOMERS-CONTROLLERS OWNER-CONTROLLERS -------------------------//
 
+
  exports.getCustomersByname = asyncerrorhandler(async(req,res,next)=>{
    
     let Name = req.params.name;
@@ -437,6 +406,9 @@ exports.getProducts = asyncerrorhandler(async(req,res,next)=>{
     })
   
 })
+
+
+
 exports.patchCustomers = asyncerrorhandler(async(req,res,next)=>{
     
         const {name,emailid} = req.params;
@@ -499,6 +471,8 @@ exports.getOwner = asyncerrorhandler(async(req,res,next)=>{
    
 })
 //----------------------------SALES-CONTROLLER----------------------------//
+
+
 exports.getCriticalQuantityProducts = asyncerrorhandler(async(req,res,next)=>{
     
         const product = await Product.find({Quantity:{$lt:10}});
@@ -508,6 +482,8 @@ exports.getCriticalQuantityProducts = asyncerrorhandler(async(req,res,next)=>{
         });
     
 })
+
+
 exports.addSales = asyncerrorhandler(async(req,res,next)=>{
    
     const {ProductName} = req.body;
@@ -544,6 +520,8 @@ exports.addSales = asyncerrorhandler(async(req,res,next)=>{
     })
    
 })
+
+
 exports.getSaleReportBydate = asyncerrorhandler(async(req,res,next)=>{
     
        const {date} = req.body;
@@ -569,7 +547,6 @@ exports.getSaleReportBydate = asyncerrorhandler(async(req,res,next)=>{
        })
    
 })
-
 
 
 exports.patchSales = asyncerrorhandler(async(req,res,next)=>{

@@ -6,11 +6,15 @@
 const {getClosestName} = require('./../Utils/Jaro_Winkler');
 const  transporter  = require('../Utils/email');
 const crypto = require('crypto');
+
+
 const asyncerrorhandler = (func)=>{
     return(req,res,next)=>{
         func(req,res,next).catch(error => next(error))
     }
 }
+
+
 const signup_token  = (data) => {
  const token = jwt.sign({id:data._id},process.env.SECRET_STRING,{
     expiresIn:process.env.EXPIRES_IN
@@ -18,8 +22,7 @@ const signup_token  = (data) => {
 })
 return token;
 }
-
- exports.addCustomers = asyncerrorhandler(async(req,res,next)=>{
+exports.addCustomers = asyncerrorhandler(async(req,res,next)=>{
     console.log(req.body);
        const {name} = req.body;
        const closest = await getClosestName(name);
@@ -41,7 +44,7 @@ return token;
     }
     
  })
- exports.addOwner = asyncerrorhandler(async(req,res,next)=>{
+exports.addOwner = asyncerrorhandler(async(req,res,next)=>{
      
          const data = await Owner.create(req.body);
          const token = signup_token(data);
@@ -52,8 +55,7 @@ return token;
          })
     
  })
-
- const login = (Model)=>  asyncerrorhandler(async(req,res,next)=>{
+const login = (Model)=>  asyncerrorhandler(async(req,res,next)=>{
     const {emailid,password} = req.body;
     if(!emailid || !password) {
         const error = new customerror('emailid or password are missing , please specify the fields',400);
@@ -76,10 +78,14 @@ return token;
     })
 
  })
+
+              
  exports.loginCustomers = login(Customers);
- exports.loginOwner = login(Owner)
  
- const protect = (Model)=> asyncerrorhandler(async(req,res,next)=>{
+ exports.loginOwner = login(Owner)
+              
+
+const protect = (Model)=> asyncerrorhandler(async(req,res,next)=>{
     const testToken = req.headers.authorization;
     let token;
     if(testToken && testToken.startsWith('Bearer')) {
@@ -106,8 +112,7 @@ return token;
     req.user = user;
     next();
  })
-
- const forgotPassword = (Model)=>asyncerrorhandler(async(req,res,next)=>{
+const forgotPassword = (Model)=>asyncerrorhandler(async(req,res,next)=>{
     console.log(req.body);
     let route_path = " ";
     if(Model === Customers) {
@@ -144,7 +149,6 @@ return token;
         return next(new customerror('there was an error sending the email,please try again later',500));
     }
  })
-
 const resetPassword = (model)=> asyncerrorhandler(async(req,res,next)=>{
    
     const decodedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
@@ -167,9 +171,41 @@ const resetPassword = (model)=> asyncerrorhandler(async(req,res,next)=>{
     })
 
 })
+
+ const updatepassword = (model)=> asyncerrorhandler(async(req,res,next)=>{
+    const user = await model.findById(req.user._id).select('+password');
+    if(!(await user.comparePasswordinDb(req.body.currentPassword,user.password))) {
+        const error = new customerror('please enter the correct password',401);
+        next(error);
+    }
+    user.password = req.body.password;
+    user.confirmpassword = req.body.confirmpassword;
+    await user.save();
+    if(user || user.emailid) {
+        await transporter.sendMail({
+            from:process.env.email_user,
+            to:user.emailid,
+            subject:'PASSWORD CHANGED INFORMATION',
+            text:'dear user ! , your password was changed recently'
+        })
+    }
+    const token = signup_token(user._id);
+    res.status(200).json({
+        status:'success',
+        TOKEN:token,
+        message:'password changed successfully!'
+    })
+
+ }) 
+ exports.updatePasswordCustomer = updatepassword(Customers);
+ exports.updatePasswordOwner = updatepassword(Owner);
  exports.resetPasswordCustomer = resetPassword(Customers);
  exports.resetPasswordOwner = resetPassword(Owner);
  exports.forgotPasswordCustomer = forgotPassword(Customers);
  exports.forgotPasswordOwner = forgotPassword(Owner);
  exports.protectByCustomer = protect(Customers);
  exports.protectByOwner = protect(Owner);
+
+
+ //AUTHENTICATION COMPLETED /////.........  :)
+  //                                     
