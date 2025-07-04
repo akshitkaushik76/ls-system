@@ -13,6 +13,10 @@ app.use(express.json());
 console.log(process.env.email_user,process.env.email_password);
 app.use('/api/buisness-manager',BusinessRouter);
 app.use('/api/buisness-manager',Authrouter);
+app.get("/", (req, res) => {
+  res.send(" Backend is running!");
+});
+
 app.all('*',(req,res,next)=>{
 //    const error = new Error(`cant find the url: ${req.originalUrl}`);
 //    error.status = 'fail';
